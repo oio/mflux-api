@@ -3,9 +3,20 @@
   <head>
     <meta charset="UTF-8" />
     <title>MFLUX Minimal Frontend</title>
+    <style>
+      #statusList {
+        background: #f9f9f9;
+        border: 1px solid #ccc;
+        padding: 10px;
+        margin-top: 20px;
+        font-family: monospace;
+        height: 150px;
+        overflow-y: auto;
+      }
+    </style>
   </head>
   <body>
-    <h1>MFLUX Demo</h1>
+    <h1>MFLUX SSE Demo</h1>
     <p>Enter a prompt for the image:</p>
 
     <input
@@ -18,54 +29,148 @@
 
     <hr />
 
-    <!-- Where we'll show the returned image -->
-    <div>
+    <!-- SSE Status Messages -->
+    <div id="statusList"></div>
+
+    <!-- Generated image -->
+    <div style="margin-top: 20px">
       <img id="outputImage" alt="Generated image will appear here" />
     </div>
 
+    <!-- Power stats -->
+    <div
+      id="powerStats"
+      style="margin-top: 20px; font-family: monospace; display: none"
+    >
+      <h2>Energy Consumption:</h2>
+      <p><strong>CPU Power Used:</strong> <span id="cpuPower">N/A</span> W</p>
+      <p><strong>GPU Power Used:</strong> <span id="gpuPower">N/A</span> W</p>
+      <p><strong>RAM Power Used:</strong> <span id="ramPower">N/A</span> W</p>
+      <p>
+        <strong>Total Power Used:</strong> <span id="totalPower">N/A</span> W
+      </p>
+      <p>
+        <strong>Session Energy Used:</strong>
+        <span id="sessionEnergy">N/A</span> Wh
+      </p>
+      <p>
+        <strong>Total Energy Used (lifetime):</strong>
+        <span id="totalEnergy">N/A</span> Wh
+      </p>
+      <p>
+        <strong>Equivalent Nespresso Coffees:</strong>
+        <span id="nespressoCount">N/A</span>
+      </p>
+    </div>
+
     <script>
-      document
-        .querySelector("#generateBtn")
-        .addEventListener("click", async () => {
-          const promptValue =
-            document.querySelector("#promptInput").value ||
-            "Luxury food photograph";
+      const promptInput = document.querySelector("#promptInput");
+      const generateBtn = document.querySelector("#generateBtn");
+      const statusList = document.querySelector("#statusList");
+      const outputImage = document.querySelector("#outputImage");
+      const powerStatsDiv = document.querySelector("#powerStats");
 
-          // Build the request body
-          const payload = {
-            model_name: "schnell", // or "dev"
-            quantize: 8, // or 4, or None
-            seed: 42, // you can randomize or let user input
-            prompt: promptValue,
-            num_inference_steps: 2, // tune as needed
-            height: 512,
-            width: 512,
-          };
+      // Utility to append status lines to #statusList
+      function appendStatus(text) {
+        const div = document.createElement("div");
+        div.textContent = text;
+        statusList.appendChild(div);
+        statusList.scrollTop = statusList.scrollHeight; // auto-scroll
+      }
 
-          try {
-            // Send POST request to FastAPI server
-            const response = await fetch("http://127.0.0.1:8000/generate", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-            });
+      generateBtn.addEventListener("click", async () => {
+        // Clear old statuses
+        statusList.innerHTML = "";
+        outputImage.src = "";
+        powerStatsDiv.style.display = "none";
 
-            if (!response.ok) {
-              throw new Error(`Server error: ${response.status}`);
-            }
+        const payload = {
+          model_name: "schnell",
+          quantize: 8,
+          seed: 42,
+          prompt: promptInput.value || "Luxury food photograph",
+          num_inference_steps: 2,
+          height: 512,
+          width: 512,
+        };
 
-            // Parse JSON: { image_base64: "...base64..." }
-            const data = await response.json();
-            const b64 = data.image_base64;
+        appendStatus("Sending request...");
 
-            // Update the <img> tag to display the base64-encoded image
-            const imgElem = document.querySelector("#outputImage");
-            imgElem.src = "data:image/png;base64," + b64;
-          } catch (err) {
-            console.error("Failed to generate image:", err);
-            alert("Error generating image. Check console/logs for details.");
-          }
+        // POST to the SSE endpoint
+        const response = await fetch("http://127.0.0.1:8000/generate", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
         });
+
+        if (!response.ok) {
+          appendStatus(`Error: ${response.status}`);
+          return;
+        }
+
+        // We'll stream the response body
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        // Read chunks in a loop
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) {
+            // end of stream
+            appendStatus("Stream finished.");
+            break;
+          }
+          // Decode chunk
+          const chunk = decoder.decode(value, { stream: true });
+          buffer += chunk;
+
+          // Process line-by-line
+          const lines = buffer.split("\n");
+          // Keep the last partial line in `buffer`
+          buffer = lines.pop();
+
+          for (const line of lines) {
+            if (line.startsWith("data: ")) {
+              // Remove "data: "
+              const dataPart = line.substring(6).trim();
+
+              // If it starts with '{', treat as JSON
+              if (dataPart.startsWith("{")) {
+                try {
+                  const jsonData = JSON.parse(dataPart);
+
+                  // This is the final chunk with base64 + stats
+                  outputImage.src =
+                    "data:image/png;base64," + jsonData.image_base64;
+                  document.querySelector("#cpuPower").textContent =
+                    jsonData.power_usage.cpu_power_used.toFixed(4);
+                  document.querySelector("#gpuPower").textContent =
+                    jsonData.power_usage.gpu_power_used.toFixed(4);
+                  document.querySelector("#ramPower").textContent =
+                    jsonData.power_usage.ram_power_used.toFixed(4);
+                  document.querySelector("#totalPower").textContent =
+                    jsonData.power_usage.total_power_used.toFixed(4);
+                  document.querySelector("#sessionEnergy").textContent =
+                    jsonData.session_energy_used.toFixed(4);
+                  document.querySelector("#totalEnergy").textContent =
+                    jsonData.total_energy_used.toFixed(4);
+                  document.querySelector("#nespressoCount").textContent =
+                    jsonData.nespresso_equiv;
+
+                  powerStatsDiv.style.display = "block";
+                  appendStatus("Final JSON received! Image and stats updated.");
+                } catch (err) {
+                  appendStatus("JSON parse error: " + err.message);
+                }
+              } else {
+                // Otherwise it's a status line
+                appendStatus(dataPart);
+              }
+            }
+          }
+        }
+      });
     </script>
   </body>
 </html>
