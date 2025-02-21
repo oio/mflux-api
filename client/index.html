@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="UTF-8" />
+    <title>MFLUX Minimal Frontend</title>
+  </head>
+  <body>
+    <h1>MFLUX Demo</h1>
+    <p>Enter a prompt for the image:</p>
+
+    <input
+      type="text"
+      id="promptInput"
+      placeholder="Enter prompt"
+      style="width: 300px"
+    />
+    <button id="generateBtn">Generate Image</button>
+
+    <hr />
+
+    <!-- Where we'll show the returned image -->
+    <div>
+      <img id="outputImage" alt="Generated image will appear here" />
+    </div>
+
+    <script>
+      document
+        .querySelector("#generateBtn")
+        .addEventListener("click", async () => {
+          const promptValue =
+            document.querySelector("#promptInput").value ||
+            "Luxury food photograph";
+
+          // Build the request body
+          const payload = {
+            model_name: "schnell", // or "dev"
+            quantize: 8, // or 4, or None
+            seed: 42, // you can randomize or let user input
+            prompt: promptValue,
+            num_inference_steps: 2, // tune as needed
+            height: 512,
+            width: 512,
+          };
+
+          try {
+            // Send POST request to FastAPI server
+            const response = await fetch("http://127.0.0.1:8000/generate", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload),
+            });
+
+            if (!response.ok) {
+              throw new Error(`Server error: ${response.status}`);
+            }
+
+            // Parse JSON: { image_base64: "...base64..." }
+            const data = await response.json();
+            const b64 = data.image_base64;
+
+            // Update the <img> tag to display the base64-encoded image
+            const imgElem = document.querySelector("#outputImage");
+            imgElem.src = "data:image/png;base64," + b64;
+          } catch (err) {
+            console.error("Failed to generate image:", err);
+            alert("Error generating image. Check console/logs for details.");
+          }
+        });
+    </script>
+  </body>
+</html>
