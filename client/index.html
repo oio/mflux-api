@@ -17,27 +17,35 @@
   </head>
   <body>
     <h1>MFLUX SSE Demo</h1>
-    <p>Enter a prompt for the image:</p>
 
-    <input
-      type="text"
-      id="promptInput"
-      placeholder="Enter prompt"
-      style="width: 300px"
-    />
-    <button id="generateBtn">Generate Image</button>
+    <div>
+      <label for="promptInput">Prompt:</label>
+      <input
+        type="text"
+        id="promptInput"
+        placeholder="e.g. Luxury food photograph"
+        style="width: 300px"
+      />
+    </div>
+
+    <!-- NEW: Inputs for width & height -->
+    <div style="margin-top: 10px">
+      <label for="imgWidth">Width:</label>
+      <input type="number" id="imgWidth" value="512" min="64" max="2048" />
+      <label for="imgHeight">Height:</label>
+      <input type="number" id="imgHeight" value="512" min="64" max="2048" />
+    </div>
+
+    <button id="generateBtn" style="margin-top: 10px">Generate Image</button>
 
     <hr />
 
-    <!-- SSE Status Messages -->
     <div id="statusList"></div>
 
-    <!-- Generated image -->
     <div style="margin-top: 20px">
       <img id="outputImage" alt="Generated image will appear here" />
     </div>
 
-    <!-- Power stats -->
     <div
       id="powerStats"
       style="margin-top: 20px; font-family: monospace; display: none"
@@ -48,35 +56,35 @@
       <p><strong>RAM Power Used:</strong> <span id="ramPower">N/A</span> W</p>
       <p>
         <strong>Total Power Used:</strong>
-        <span id="totalPower">N/A</span> W
-        <!-- NEW: show # coffees for THIS generation if needed -->
-        (<span id="thisNespresso">N/A</span> coffees)
+        <span id="totalPower">N/A</span> W (<span id="thisNespresso">N/A</span>
+        coffees for this generation)
       </p>
+
       <p>
         <strong>Session Energy Used:</strong>
-        <span id="sessionEnergy">N/A</span> Wh
-        <!-- NEW: show # coffees for session -->
-        (<span id="sessionCoffees">N/A</span> coffees)
+        <span id="sessionEnergy">N/A</span> Wh (<span id="sessionCoffees"
+          >N/A</span
+        >
+        coffees this session)
       </p>
-      <p>
-        <strong>Equivalent Nespresso Coffees for This Gen:</strong>
-        <span id="nespressoCount">N/A</span>
-      </p>
-      <p>--------------------------------</p>
-      <p>
-        <strong>Images Generated (Lifetime):</strong>
-        <span id="totalImgCount">0</span>
-      </p>
+
       <p>
         <strong>Total Energy Used (lifetime):</strong>
-        <span id="totalEnergy">N/A</span> Wh
-        <!-- NEW: show # coffees for total -->
-        (<span id="totalCoffees">N/A</span> coffees)
+        <span id="totalEnergy">N/A</span> Wh (<span id="totalCoffees">N/A</span>
+        coffees total)
       </p>
-      <!-- or you can omit the above if you're showing it in "Total Power Used" row -->
+
+      <p>
+        <strong>Equivalent Nespresso Coffees (this gen):</strong>
+        <span id="nespressoCount">N/A</span>
+      </p>
+
+      <p>
+        <strong>Total Images Generated:</strong>
+        <span id="totalImgCount">N/A</span>
+      </p>
     </div>
 
-    <!-- NEW: Macmon Note -->
     <div
       id="macmonNote"
       style="
@@ -87,15 +95,9 @@
         padding-bottom: 30px;
       "
     >
-      <p>
-        <strong>To add power consumption tracking, install macmon.</strong>
-        <span style="padding: 4px; background: #222; color: #f5f5f5"
-          >brew install macmon</span
-        >
-      </p>
+      <!-- … your existing macmon note … -->
     </div>
 
-    <!-- NEW: Generation Time -->
     <div
       id="generationTimeDiv"
       style="margin-top: 20px; font-family: monospace; display: none"
@@ -106,6 +108,11 @@
     <script>
       const promptInput = document.querySelector("#promptInput");
       const generateBtn = document.querySelector("#generateBtn");
+
+      // NEW references for width & height
+      const widthInput = document.querySelector("#imgWidth");
+      const heightInput = document.querySelector("#imgHeight");
+
       const statusList = document.querySelector("#statusList");
       const outputImage = document.querySelector("#outputImage");
       const powerStatsDiv = document.querySelector("#powerStats");
@@ -126,14 +133,17 @@
         macmonNote.style.display = "none";
         generationTimeDiv.style.display = "none";
 
+        // Build the payload from user inputs
         const payload = {
           model_name: "schnell",
           quantize: 8,
           seed: 42,
           prompt: promptInput.value || "Luxury food photograph",
           num_inference_steps: 2,
-          height: 512,
-          width: 512,
+
+          // NEW: parse width & height from numeric inputs
+          width: parseInt(widthInput.value, 10) || 512,
+          height: parseInt(heightInput.value, 10) || 512,
         };
 
         appendStatus("Sending request...");
@@ -149,6 +159,7 @@
           return;
         }
 
+        // SSE reading loop (unchanged from your existing code)...
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
@@ -176,7 +187,7 @@
                   outputImage.src =
                     "data:image/png;base64," + jsonData.image_base64;
 
-                  // NEW: show generation time
+                  // Display generation time if present
                   if (jsonData.generation_time_s !== undefined) {
                     document.querySelector("#genTime").textContent =
                       jsonData.generation_time_s.toFixed(2);
