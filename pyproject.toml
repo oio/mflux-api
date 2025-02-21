@@ -13,4 +13,4 @@ dependencies = [
 ]
 
 [tool.uv.sources]
-mflux = { path = "../mflux" }
+mflux = { git = "https://github.com/filipstrand/mflux.git" }
