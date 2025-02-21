@@ -1,6 +1,8 @@
 # simple mflux api
 
-bare-bone web API to the [mflux library](https://github.com/filipstrand/mflux). mflux lib is not really updated on the pip repositories, so it's manually linked to the github repository in `pyproject.toml`.
+bare-bone web API to the [mflux library](https://github.com/filipstrand/mflux).
+
+mflux lib is not really updated on the pip repositories, so it's manually linked to the github repository in `pyproject.toml`.
 
 this is just a simple API wrapper, for a full breakdown of mflux capabilities, check out the [mflux github](https://github.com/filipstrand/mflux).
 
