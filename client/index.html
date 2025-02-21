@@ -47,20 +47,33 @@
       <p><strong>GPU Power Used:</strong> <span id="gpuPower">N/A</span> W</p>
       <p><strong>RAM Power Used:</strong> <span id="ramPower">N/A</span> W</p>
       <p>
-        <strong>Total Power Used:</strong> <span id="totalPower">N/A</span> W
+        <strong>Total Power Used:</strong>
+        <span id="totalPower">N/A</span> W
+        <!-- NEW: show # coffees for THIS generation if needed -->
+        (<span id="thisNespresso">N/A</span> coffees)
       </p>
       <p>
         <strong>Session Energy Used:</strong>
         <span id="sessionEnergy">N/A</span> Wh
+        <!-- NEW: show # coffees for session -->
+        (<span id="sessionCoffees">N/A</span> coffees)
+      </p>
+      <p>
+        <strong>Equivalent Nespresso Coffees for This Gen:</strong>
+        <span id="nespressoCount">N/A</span>
+      </p>
+      <p>--------------------------------</p>
+      <p>
+        <strong>Images Generated (Lifetime):</strong>
+        <span id="totalImgCount">0</span>
       </p>
       <p>
         <strong>Total Energy Used (lifetime):</strong>
         <span id="totalEnergy">N/A</span> Wh
+        <!-- NEW: show # coffees for total -->
+        (<span id="totalCoffees">N/A</span> coffees)
       </p>
-      <p>
-        <strong>Equivalent Nespresso Coffees:</strong>
-        <span id="nespressoCount">N/A</span>
-      </p>
+      <!-- or you can omit the above if you're showing it in "Total Power Used" row -->
     </div>
 
     <!-- NEW: Macmon Note -->
@@ -71,10 +84,23 @@
         color: #666;
         margin-top: 20px;
         display: none;
+        padding-bottom: 30px;
       "
     >
-      <strong>To add power consumption tracking, install macmon.</strong><br />
-      <em>For example: brew install macmon</em>
+      <p>
+        <strong>To add power consumption tracking, install macmon.</strong>
+        <span style="padding: 4px; background: #222; color: #f5f5f5"
+          >brew install macmon</span
+        >
+      </p>
+    </div>
+
+    <!-- NEW: Generation Time -->
+    <div
+      id="generationTimeDiv"
+      style="margin-top: 20px; font-family: monospace; display: none"
+    >
+      <strong>Generation took:</strong> <span id="genTime">N/A</span> seconds
     </div>
 
     <script>
@@ -84,21 +110,21 @@
       const outputImage = document.querySelector("#outputImage");
       const powerStatsDiv = document.querySelector("#powerStats");
       const macmonNote = document.querySelector("#macmonNote");
+      const generationTimeDiv = document.querySelector("#generationTimeDiv");
 
-      // Utility to append status lines to #statusList
       function appendStatus(text) {
         const div = document.createElement("div");
         div.textContent = text;
         statusList.appendChild(div);
-        statusList.scrollTop = statusList.scrollHeight; // auto-scroll
+        statusList.scrollTop = statusList.scrollHeight;
       }
 
       generateBtn.addEventListener("click", async () => {
-        // Clear old statuses & image
         statusList.innerHTML = "";
         outputImage.src = "";
         powerStatsDiv.style.display = "none";
         macmonNote.style.display = "none";
+        generationTimeDiv.style.display = "none";
 
         const payload = {
           model_name: "schnell",
@@ -112,7 +138,6 @@
 
         appendStatus("Sending request...");
 
-        // POST to the SSE endpoint
         const response = await fetch("http://127.0.0.1:8000/generate", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -124,12 +149,10 @@
           return;
         }
 
-        // We'll stream the response body
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";
 
-        // Read chunks in a loop
         while (true) {
           const { done, value } = await reader.read();
           if (done) {
@@ -139,26 +162,31 @@
           const chunk = decoder.decode(value, { stream: true });
           buffer += chunk;
 
-          // Process line-by-line
           const lines = buffer.split("\n");
-          buffer = lines.pop(); // keep leftover partial line
+          buffer = lines.pop();
 
           for (const line of lines) {
             if (line.startsWith("data: ")) {
-              // remove "data: "
               const dataPart = line.substring(6).trim();
-
-              // If it starts with '{', treat as JSON
               if (dataPart.startsWith("{")) {
                 try {
                   const jsonData = JSON.parse(dataPart);
+
                   // Show the final image
                   outputImage.src =
                     "data:image/png;base64," + jsonData.image_base64;
 
-                  // If macmon is installed, we have power usage
+                  // NEW: show generation time
+                  if (jsonData.generation_time_s !== undefined) {
+                    document.querySelector("#genTime").textContent =
+                      jsonData.generation_time_s.toFixed(2);
+                    generationTimeDiv.style.display = "block";
+                  }
+
+                  // If macmon installed => show power
                   if (jsonData.macmon_installed) {
                     if (jsonData.power_usage) {
+                      // single generation usage
                       document.querySelector("#cpuPower").textContent =
                         jsonData.power_usage.cpu_power_used.toFixed(4);
                       document.querySelector("#gpuPower").textContent =
@@ -167,22 +195,41 @@
                         jsonData.power_usage.ram_power_used.toFixed(4);
                       document.querySelector("#totalPower").textContent =
                         jsonData.power_usage.total_power_used.toFixed(4);
+                      // how many coffees for this single generation
+                      document.querySelector("#thisNespresso").textContent =
+                        jsonData.nespresso_equiv.toFixed(4);
+
+                      // session usage
                       document.querySelector("#sessionEnergy").textContent =
                         jsonData.session_energy_used.toFixed(4);
+                      document.querySelector("#sessionCoffees").textContent =
+                        jsonData.session_energy_nespresso
+                          ? jsonData.session_energy_nespresso.toFixed(4)
+                          : "N/A";
+
+                      // total usage
                       document.querySelector("#totalEnergy").textContent =
                         jsonData.total_energy_used.toFixed(4);
+                      document.querySelector("#totalCoffees").textContent =
+                        jsonData.total_energy_nespresso
+                          ? jsonData.total_energy_nespresso.toFixed(4)
+                          : "N/A";
+                      document.querySelector("#totalImgCount").textContent =
+                        jsonData.total_image_count;
+
+                      // old place for single generation coffees
                       document.querySelector("#nespressoCount").textContent =
-                        jsonData.nespresso_equiv;
+                        jsonData.nespresso_equiv.toFixed(4);
+
                       powerStatsDiv.style.display = "block";
                       appendStatus(
                         "Final JSON received! Image and stats updated."
                       );
                     } else {
-                      // If for some reason there's no power_usage, hide stats
                       powerStatsDiv.style.display = "none";
                     }
                   } else {
-                    // macmon is NOT installed, show note
+                    // macmon not installed
                     macmonNote.style.display = "block";
                     appendStatus("macmon not installed, no power usage data.");
                   }
@@ -190,7 +237,6 @@
                   appendStatus("JSON parse error: " + err.message);
                 }
               } else {
-                // Otherwise it's a status line
                 appendStatus(dataPart);
               }
             }
