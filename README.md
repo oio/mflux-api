@@ -8,7 +8,7 @@ this is just a simple API wrapper, for a full breakdown of mflux capabilities, c
 
 ## install and run
 
-first install the dependencies
+first install the dependencies using [uv](https://github.com/astral-sh/uv?tab=readme-ov-file#installation)
 
 ```
 uv sync
