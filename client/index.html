@@ -13,30 +13,35 @@
         height: 150px;
         overflow-y: auto;
       }
+
+      .input-group {
+        margin-top: 10px;
+      }
     </style>
   </head>
   <body>
     <h1>MFLUX SSE Demo</h1>
 
     <div>
-      <label for="promptInput">Prompt:</label>
-      <input
-        type="text"
-        id="promptInput"
-        placeholder="e.g. Luxury food photograph"
-        style="width: 300px"
-      />
-    </div>
+      <div class="input-group">
+        <label for="promptInput">Text Prompt:</label>
+        <input
+          type="text"
+          id="promptInput"
+          placeholder="e.g. Luxury food photograph"
+          style="width: 300px"
+        />
+      </div>
 
-    <!-- NEW: Inputs for width & height -->
-    <div style="margin-top: 10px">
-      <label for="imgWidth">Width:</label>
-      <input type="number" id="imgWidth" value="512" min="64" max="2048" />
-      <label for="imgHeight">Height:</label>
-      <input type="number" id="imgHeight" value="512" min="64" max="2048" />
-    </div>
+      <div class="input-group">
+        <label for="imgWidth">Width:</label>
+        <input type="number" id="imgWidth" value="512" min="64" max="2048" />
+        <label for="imgHeight">Height:</label>
+        <input type="number" id="imgHeight" value="512" min="64" max="2048" />
+      </div>
 
-    <button id="generateBtn" style="margin-top: 10px">Generate Image</button>
+      <button id="generateBtn" style="margin-top: 10px">Generate Image</button>
+    </div>
 
     <hr />
 
@@ -106,13 +111,11 @@
     </div>
 
     <script>
+      // DOM Elements
       const promptInput = document.querySelector("#promptInput");
       const generateBtn = document.querySelector("#generateBtn");
-
-      // NEW references for width & height
       const widthInput = document.querySelector("#imgWidth");
       const heightInput = document.querySelector("#imgHeight");
-
       const statusList = document.querySelector("#statusList");
       const outputImage = document.querySelector("#outputImage");
       const powerStatsDiv = document.querySelector("#powerStats");
@@ -140,8 +143,6 @@
           seed: 42,
           prompt: promptInput.value || "Luxury food photograph",
           num_inference_steps: 2,
-
-          // NEW: parse width & height from numeric inputs
           width: parseInt(widthInput.value, 10) || 512,
           height: parseInt(heightInput.value, 10) || 512,
         };
@@ -159,7 +160,7 @@
           return;
         }
 
-        // SSE reading loop (unchanged from your existing code)...
+        // SSE reading loop
         const reader = response.body.getReader();
         const decoder = new TextDecoder();
         let buffer = "";

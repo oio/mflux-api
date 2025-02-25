@@ -7,18 +7,20 @@ import time
 from fastapi import FastAPI, Body
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+from typing import Optional
 from PIL import Image
 from mflux import Flux1, Config
 
 USAGE_FILE = "usage.yo"
 NESPRESSO_ENERGY_WH = 10.5
+MACMON_PATH = "./macmon/0.5.1/bin/macmon"
 
 ##########################
 # Detect if macmon exists
 ##########################
 try:
-    subprocess.run(["macmon", "--version"], check=True, capture_output=True)
+    subprocess.run([MACMON_PATH, "--version"], check=True, capture_output=True)
     MACMON_INSTALLED = True
     print("macmon detected. Power usage will be tracked.")
 except Exception:
@@ -87,13 +89,16 @@ class GenerateRequest(BaseModel):
     num_inference_steps: int = 2
     height: int = 1024
     width: int = 1024
+    # Keep these fields for future compatibility, but they won't be used for now
+    image_prompt: Optional[str] = Field(None, description="Base64 encoded image data (not supported yet)")
+    image_weight: Optional[float] = Field(0.5, description="Weight for the image prompt (not supported yet)")
 
 def get_macmon_metrics():
     """If macmon not installed, return None. Otherwise, return a dict of power usage."""
     if not MACMON_INSTALLED:
         return None
     try:
-        result = subprocess.run(["macmon", "pipe", "-s", "1"], capture_output=True, text=True)
+        result = subprocess.run([MACMON_PATH, "pipe", "-s", "1"], capture_output=True, text=True)
         data = json.loads(result.stdout.strip())
         return {
             "cpu_power": data.get("cpu_power", 0),
@@ -116,6 +121,10 @@ async def generate_image(req: GenerateRequest = Body(...)):
 
         yield "data: Generation started...\n\n"
 
+        # Notify if image prompt was provided but won't be used
+        if req.image_prompt:
+            yield "data: Image-to-image generation is not supported in this version. Using text-only generation...\n\n"
+
         # (A) Load & configure MFLUX model
         yield "data: Loading MFLUX Model...\n\n"
         flux = Flux1.from_name(req.model_name, req.quantize)
@@ -133,6 +142,7 @@ async def generate_image(req: GenerateRequest = Body(...)):
         start_time = time.time()
 
         # (D) Generate the image
+        yield "data: Generating with text prompt...\n\n"
         generated_image = flux.generate_image(req.seed, req.prompt, config=config)
         elapsed = time.time() - start_time
         yield f"data: Image generated ({elapsed:.2f} seconds)...\n\n"
@@ -151,8 +161,8 @@ async def generate_image(req: GenerateRequest = Body(...)):
             "total_energy_used": None,
             "total_energy_nespresso": None,
             "generation_time_s": elapsed,
-            "session_image_count": None,  # new
-            "total_image_count": None,    # new
+            "session_image_count": None,
+            "total_image_count": None,
         }
 
         # Convert image to base64
