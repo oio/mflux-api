@@ -40,6 +40,19 @@
         <input type="number" id="imgHeight" value="512" min="64" max="2048" />
       </div>
 
+      <div class="input-group">
+        <label for="seedInput">Seed (optional):</label>
+        <input
+          type="number"
+          id="seedInput"
+          placeholder="Random if empty"
+          min="1"
+          max="999999"
+        />
+        <label for="inferenceSteps">Inference Steps:</label>
+        <input type="number" id="inferenceSteps" value="2" min="1" max="50" />
+      </div>
+
       <button id="generateBtn" style="margin-top: 10px">Generate Image</button>
     </div>
 
@@ -116,6 +129,8 @@
       const generateBtn = document.querySelector("#generateBtn");
       const widthInput = document.querySelector("#imgWidth");
       const heightInput = document.querySelector("#imgHeight");
+      const seedInput = document.querySelector("#seedInput");
+      const inferenceStepsInput = document.querySelector("#inferenceSteps");
       const statusList = document.querySelector("#statusList");
       const outputImage = document.querySelector("#outputImage");
       const powerStatsDiv = document.querySelector("#powerStats");
@@ -140,12 +155,17 @@
         const payload = {
           model_name: "schnell",
           quantize: 8,
-          seed: 42,
           prompt: promptInput.value || "Luxury food photograph",
-          num_inference_steps: 2,
+          num_inference_steps: parseInt(inferenceStepsInput.value, 10) || 2,
           width: parseInt(widthInput.value, 10) || 512,
           height: parseInt(heightInput.value, 10) || 512,
         };
+        
+        // Only add seed if provided
+        const seedValue = seedInput.value.trim();
+        if (seedValue) {
+          payload.seed = parseInt(seedValue, 10);
+        }
 
         appendStatus("Sending request...");
 
@@ -232,6 +252,11 @@
                       // old place for single generation coffees
                       document.querySelector("#nespressoCount").textContent =
                         jsonData.nespresso_equiv.toFixed(4);
+                        
+                      // Display the seed in the status
+                      if (jsonData.seed) {
+                        appendStatus(`Seed used: ${jsonData.seed}`);
+                      }
 
                       powerStatsDiv.style.display = "block";
                       appendStatus(
