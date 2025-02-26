@@ -31,5 +31,5 @@ just run a web server in the client folder to test it out.
 ## next steps
 
 - [x] ~~add a simple web frontend to test the api~~
-- [ ] add a queue system (_you are position #4 in the queue_) etc.
-- [ ] add error handling
+- [x] ~~add a queue system (_you are position #4 in the queue_) etc.~~
+- [x] ~~add error handling~~
